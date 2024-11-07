@@ -3,13 +3,11 @@
 function dodajProizvod($naziv, $opis, $kolicina) {
     $datoteka = 'inventar.txt';
     
-    // Otvori datoteku ili je stvori ako ne postoji
     if (!file_exists($datoteka)) {
         $handle = fopen($datoteka, 'w');
         fclose($handle);
     }
     
-    // Provjeri postoji li proizvod s istim nazivom
     $sadrzaj = file($datoteka, FILE_IGNORE_NEW_LINES);
     foreach ($sadrzaj as $linija) {
         list($id, $postojeciNaziv) = explode('|', $linija);
@@ -19,10 +17,7 @@ function dodajProizvod($naziv, $opis, $kolicina) {
         }
     }
     
-    // Generiraj novi ID
     $id = count($sadrzaj) + 1;
-    
-    // Zapiši novi proizvod
     $noviProizvod = "$id|$naziv|$opis|$kolicina\n";
     file_put_contents($datoteka, $noviProizvod, FILE_APPEND | LOCK_EX);
     echo "Proizvod dodan uspješno.";
@@ -41,6 +36,19 @@ function dohvatiProizvode() {
         $proizvodi[] = ["ID" => $id, "Naziv" => $naziv, "Opis" => $opis, "Količina" => $kolicina];
     }
     return $proizvodi;
+}
+
+// Funkcija za sortiranje proizvoda
+function sortirajProizvode(&$proizvodi, $kriterij) {
+    if ($kriterij === 'naziv') {
+        usort($proizvodi, function($a, $b) {
+            return strcmp($a['Naziv'], $b['Naziv']);
+        });
+    } elseif ($kriterij === 'kolicina') {
+        usort($proizvodi, function($a, $b) {
+            return $a['Količina'] - $b['Količina'];
+        });
+    }
 }
 
 // Funkcija za ažuriranje količine proizvoda
@@ -100,6 +108,7 @@ function obrisiProizvod($id) {
 }
 
 // Obrada zahtjeva iz formi
+$proizvodi = [];
 if ($_SERVER['REQUEST_METHOD'] === 'POST') {
     if (isset($_POST['dodaj'])) {
         dodajProizvod($_POST['naziv'], $_POST['opis'], $_POST['kolicina']);
@@ -108,15 +117,19 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
     } elseif (isset($_POST['obrisi'])) {
         obrisiProizvod($_POST['id']);
     } elseif (isset($_POST['pretrazi'])) {
-        $rezultati = pretraziProizvode($_POST['pojam']);
-        foreach ($rezultati as $proizvod) {
-            echo $proizvod['Naziv'] . " - " . $proizvod['Opis'] . " (" . $proizvod['Količina'] . " komada)<br>";
-        }
+        $proizvodi = pretraziProizvode($_POST['pojam']); // Prikaži samo rezultate pretrage
     }
 }
 
-// Prikaz svih proizvoda
-$proizvodi = dohvatiProizvode();
+// Prikaz svih proizvoda ili rezultata pretrage
+if (empty($proizvodi)) {
+    $proizvodi = dohvatiProizvode();
+}
+
+// Primjena sortiranja ako je odabrano
+if (isset($_GET['sortiraj'])) {
+    sortirajProizvode($proizvodi, $_GET['sortiraj']);
+}
 ?>
 
 <!DOCTYPE html>
@@ -152,6 +165,15 @@ $proizvodi = dohvatiProizvode();
 <form action="inventar.php" method="post">
     <input type="number" name="id" placeholder="ID proizvoda" required>
     <button type="submit" name="obrisi">Obriši proizvod</button>
+</form>
+
+<h1>Sortiranje proizvoda</h1>
+<form action="inventar.php" method="get">
+    <select name="sortiraj">
+        <option value="naziv">Naziv</option>
+        <option value="kolicina">Količina</option>
+    </select>
+    <button type="submit">Sortiraj</button>
 </form>
 
 <h1>Popis svih proizvoda</h1>
